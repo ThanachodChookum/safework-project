@@ -172,10 +172,10 @@ function Message({ msg, onPreview }) {
 
   const downloadExcel = () => {
     // Basic CSV to pseudo-excel (tab-separated)
-    const content = msg.content.includes('```') 
-      ? msg.content.match(/```(?:csv|excel|xlsx)?\n([\s\S]*?)```/)?.[1] || msg.content 
+    const content = msg.content.includes('```')
+      ? msg.content.match(/```(?:csv|excel|xlsx)?\n([\s\S]*?)```/)?.[1] || msg.content
       : msg.content;
-    
+
     const blob = new Blob([content], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -191,7 +191,7 @@ function Message({ msg, onPreview }) {
     element.style.color = '#333';
     element.style.background = '#fff';
     element.style.fontFamily = 'Sarabun, sans-serif';
-    
+
     // Basic Markdown to HTML conversion for PDF
     let htmlContent = msg.content
       .replace(/# (.*)/g, '<h1 style="color:#000; text-align:center; border-bottom:1px solid #ccc; padding-bottom:10px;">$1</h1>')
@@ -202,7 +202,7 @@ function Message({ msg, onPreview }) {
       .replace(/\n/g, '<br/>');
 
     element.innerHTML = `<div style="max-width:800px; margin:auto;">${htmlContent}</div>`;
-    
+
     const opt = {
       margin: 10,
       filename: 'AI_Report.pdf',

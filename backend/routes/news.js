@@ -14,13 +14,24 @@ const parser = new Parser({
   },
 });
 
-// ─── Thai accident keywords ───────────────────────────────────────────────────
-const ACCIDENT_KEYWORDS = [
+const STRICT_ACCIDENT_KEYWORDS = [
   'อุบัติเหตุ', 'ชนกัน', 'ชนท้าย', 'พลิกคว่ำ', 'ตกถนน', 'ตกเขา', 'ตกคลอง',
-  'รถชน', 'รถยนต์ชน', 'รถบรรทุก', 'มอเตอร์ไซค์ชน', 'จักรยานยนต์ชน',
-  'ไฟไหม้', 'ระเบิด', 'สะพานถล่ม', 'ดินถล่ม', 'น้ำท่วม',
-  'คนเจ็บ', 'ดับ', 'เสียชีวิต', 'บาดเจ็บ', 'เสียหาย',
-  'ทางหลวง', 'ทางด่วน', 'ถนน', 'intersection',
+  'รถชน', 'รถยนต์ชน', 'รถบรรทุกชน', 'มอเตอร์ไซค์ชน', 'จักรยานยนต์ชน', 'จยย.ชน', 'เก๋งชน', 'กระบะชน', 'สิบล้อชน',
+  'ไฟไหม้', 'เพลิงไหม้', 'ระเบิด', 'สะพานถล่ม', 'ดินถล่ม', 'ตึกถล่ม',
+  'รถไฟชน', 'เรือล่ม', 'เครื่องบินตก', 'เสียหลัก', 'พุ่งชน', 'อัดก๊อปปี้', 'ประสานงา',
+  'รถตู้ชน', 'รถทัวร์ชน', 'รถแหกโค้ง', 'รถตกคลอง', 'รถตกถนน'
+];
+
+const FOREIGN_KEYWORDS = [
+  'ต่างประเทศ', 'สหรัฐ', 'อเมริกา', 'เกาหลี', 'ญี่ปุ่น', 'ไต้หวัน', 'รัสเซีย', 'ยูเครน', 
+  'อิสราเอล', 'ฮามาส', 'ปาเลสไตน์', 'พม่า', 'เมียนมา', 'อินเดีย', 'ยุโรป', 'โลก', 'กาซา',
+  'ปารีส', 'ลอนดอน', 'นิวยอร์ก', 'โตเกียว'
+];
+
+const NEGATIVE_KEYWORDS = [
+  'เลขเด็ด', 'หวย', 'สลากกินแบ่ง', 'ส่องทะเบียน', 'งวดนี้', 'คอหวย', 'พุทธาภิเษก',
+  'มือวางระเบิด', 'ลอบวางระเบิด', 'ลอบยิง', 'ก่อการร้าย', 'อายัดตัว', 'ผู้ต้องหา', 'หมายจับ', 'คดีอาญา', 'ศาลพิพากษา',
+  'โครงกระดูก', 'คนหาย', 'ฆาตกรรม', 'ล่วงละเมิด', 'จับกุม', 'รวบตัว', 'บุกค้น'
 ];
 
 // ─── RSS feed sources (Thailand) ─────────────────────────────────────────────
@@ -57,8 +68,23 @@ let cache = { data: null, ts: 0 };
 const CACHE_TTL = 5 * 60 * 1000;
 
 function isAccident(item) {
-  const text = `${item.title || ''} ${item.contentSnippet || ''} ${item.description || ''}`;
-  return ACCIDENT_KEYWORDS.some(kw => text.includes(kw));
+  const text = `${item.title || ''} ${item.description || ''}`;
+  
+  // 1. Must contain a strict accident action keyword
+  const hasAccident = STRICT_ACCIDENT_KEYWORDS.some(kw => text.includes(kw));
+  if (!hasAccident) return false;
+
+  // 2. Must NOT contain negative keywords (crime, lottery, missing persons, etc.)
+  const hasNegative = NEGATIVE_KEYWORDS.some(kw => text.includes(kw));
+  if (hasNegative) return false;
+
+  // 3. Must NOT be foreign news, UNLESS a Thai province is explicitly mentioned
+  const isForeign = FOREIGN_KEYWORDS.some(kw => text.includes(kw));
+  if (isForeign && !item.location) {
+    return false; // It's foreign and has no Thai location, discard it
+  }
+
+  return true;
 }
 
 function extractImage(item) {
