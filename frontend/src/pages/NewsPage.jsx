@@ -151,11 +151,24 @@ function MapPanel({ selected, onClose }) {
   return (
     <div className="map-panel">
       <div className="map-panel-header">
-        <div>
+        <div style={{ flex: 1, paddingRight: '20px' }}>
           <div className="map-panel-title">📍 แผนที่เหตุการณ์</div>
-          <div className="map-panel-sub">{selected.title}</div>
+          <h2 className="map-panel-sub" style={{ fontSize: '18px', color: '#fff', marginBottom: '8px' }}>{selected.title}</h2>
+          
+          <div className="news-details-extended" style={{ fontSize: '14px', color: '#ccc', marginBottom: '12px', lineHeight: '1.6' }}>
+            {selected.description && <p style={{ marginBottom: '8px' }}>{selected.description}</p>}
+            <div style={{ display: 'flex', gap: '15px', fontSize: '12px', color: '#888' }}>
+              <span>📰 {selected.source}</span>
+              <span>🕒 {relTime(selected.pubDate)}</span>
+              {selected.link && (
+                <a href={selected.link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+                  อ่านข่าวเต็ม ↗
+                </a>
+              )}
+            </div>
+          </div>
         </div>
-        <button className="map-close" onClick={onClose}>✕</button>
+        <button className="map-close" onClick={onClose} style={{ alignSelf: 'flex-start', marginTop: '5px' }}>✕</button>
       </div>
 
       <div className="map-container" ref={mapRef}>

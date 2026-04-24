@@ -108,7 +108,16 @@ router.get('/news', async (req, res) => {
         return rss.items.map(item => ({
           id: item.guid || item.link || `${feed.name}-${item.pubDate}`,
           title: item.title || '',
-          description: (item.contentSnippet || item.description || '').replace(/<[^>]+>/g, '').slice(0, 200),
+          description: (() => {
+            let d = (item.contentSnippet || item.description || '')
+              .replace(/<[^>]+>/g, '') // Remove HTML tags
+              .replace(/\[\.\.\.\]/g, '') // Remove [...] anywhere
+              .replace(/\[\&#8230;\]/g, '') // Remove HTML entity version
+              .replace(/\&#8230;/g, '') // Remove HTML entity
+              .replace(/\.\.\./g, '') // Remove ... anywhere
+              .trim();
+            return d.length > 350 ? d.substring(0, 350).trim() + '...' : d;
+          })(),
           link: item.link || '',
           pubDate: item.pubDate || item.isoDate || '',
           source: feed.name,
