@@ -73,6 +73,13 @@ async function buildUserContent(text, file) {
 router.post('/chat', upload.single('file'), async (req, res) => {
   try {
     const { message, history } = req.body;
+    console.log('[CHAT] New Request:', { message, historyLength: history?.length, hasFile: !!req.file });
+
+    if (!process.env.TYPHOON_API_KEY) {
+      console.error('[CHAT ERROR] Missing TYPHOON_API_KEY');
+      return res.status(500).json({ error: 'Server configuration error: Missing API Key' });
+    }
+
     if (!message && !req.file) {
       return res.status(400).json({ error: 'message or file is required' });
     }
@@ -99,41 +106,52 @@ router.post('/chat', upload.single('file'), async (req, res) => {
     const formattedMessages = [
       {
         role: 'system',
-        content: `คุณเป็น Coworker AI ที่ช่วยงานด้านเอกสาร โค้ด และการวิเคราะห์ไฟล์
-      
-ความสามารถของคุณ:
-- สร้าง แก้ไข และวิเคราะห์ไฟล์ทุกประเภท (PDF, Word, Excel, code, ข้อความ, รูปภาพ)
-- เขียนและแก้ไขโค้ดทุกภาษา
-- สรุปและวิเคราะห์เอกสาร
-- แปลงรูปแบบไฟล์ (เช่น อธิบายวิธีแปลง CSV เป็น JSON)
-- ตอบเป็นภาษาไทยเสมอ ยกเว้นโค้ดหรือคำศัพท์เทคนิค
-- ตอบตรง กระชับ แต่ครบถ้วน
-- ห้ามเกริ่นนำ (เช่น "นี่คือข้อมูล", "แน่นอน!") และห้ามสรุปปิดท้าย (เช่น "ต้องการอะไรเพิ่มไหม") ให้ตอบเฉพาะเนื้อหาล้วนๆ ทันที
-- ห้ามพยายามสร้างไฟล์ด้วย Base64 หรือ Data URI เด็ดขาด ให้พิมพ์เนื้อหาออกมาเป็น Markdown ธรรมดา (ระบบจะมีปุ่มให้ผู้ใช้ดาวน์โหลดข้อความเป็นไฟล์ Word เอง)`
+        content: `You are Coworker AI, a professional Thai assistant.
+Capabilities: File analysis (PDF, Word, Excel, Code), generation of any file format, and summarization.
+Rules:
+1. Always respond in Thai. Be concise.
+2. No intro/outro (e.g., "Certainly!", "Here is..."). Start immediately.
+3. Use Code Blocks for structured files (CSV, JSON, Code) with correct lang/ext.
+4. Use normal Markdown for reports and articles.
+5. If requested for a specific file format, provide its content in a code block.`
       },
-      ...messages.map(m => {
-        let content = m.content;
-        if (Array.isArray(m.content)) {
-          // Flatten array into text
-          content = m.content.map(c => {
-            if (c.type === 'text') return c.text;
-            if (c.type === 'image' || c.type === 'document') {
-               return `[แนบไฟล์ประเภท ${c.source.media_type}]`;
-            }
-            return JSON.stringify(c);
-          }).join('\n');
-        }
-        return { role: m.role, content };
-      })
+      ...messages
+        .filter(m => m.content && !m.content.startsWith('⌛'))
+        .map(m => {
+          let content = m.content;
+          if (Array.isArray(m.content)) {
+            content = m.content.map(c => c.text || '').join('\n');
+          }
+          return { role: m.role, content: String(content) };
+        })
     ];
 
-    const stream = await client.chat.completions.create({
-      model: 'typhoon-v2.5-30b-a3b-instruct',
-      messages: formattedMessages,
-      stream: true,
-      max_tokens: 4096,
-    });
+    console.log('[CHAT] Final Payload:', JSON.stringify(formattedMessages.slice(-2)));
 
+    console.log('[CHAT] Calling Typhoon API...');
+    
+    // Add an AbortController to set a hard timeout (e.g., 20 seconds) for the initial response
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    let stream;
+    try {
+      stream = await client.chat.completions.create({
+        model: 'typhoon-v2.5-30b-a3b-instruct',
+        messages: formattedMessages,
+        stream: true,
+        max_tokens: 4096,
+      }, { signal: controller.signal });
+      clearTimeout(timeoutId);
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') {
+        throw new Error('API Timeout: ระบบ API ของ Typhoon ไม่ตอบสนองในเวลาที่กำหนด (อาจเกิดจากเซิร์ฟเวอร์หลักล่มหรือหน่วง)');
+      }
+      throw e;
+    }
+
+    console.log('[CHAT] Stream started, sending chunks...');
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
       if (content) {
@@ -141,8 +159,8 @@ router.post('/chat', upload.single('file'), async (req, res) => {
       }
     }
     
+    console.log('[CHAT] Stream finished successfully');
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-
     res.end();
   } catch (err) {
     console.error('[CHAT ERROR]', err.message);
