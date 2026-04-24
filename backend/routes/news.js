@@ -111,12 +111,9 @@ router.get('/news', async (req, res) => {
           description: (() => {
             let d = (item.contentSnippet || item.description || '')
               .replace(/<[^>]+>/g, '') // Remove HTML tags
-              .replace(/\[\.\.\.\]/g, '') // Remove [...] anywhere
-              .replace(/\[\&#8230;\]/g, '') // Remove HTML entity version
-              .replace(/\&#8230;/g, '') // Remove HTML entity
-              .replace(/\.\.\./g, '') // Remove ... anywhere
+              .replace(/\s*\[?(\.\.\.|…|\&#8230;)\]?/g, '') // Remove all variations of ..., …, [...], […]
               .trim();
-            return d.length > 350 ? d.substring(0, 350).trim() + '...' : d;
+            return d.length > 180 ? d.substring(0, 180).trim() + '...' : d;
           })(),
           link: item.link || '',
           pubDate: item.pubDate || item.isoDate || '',
